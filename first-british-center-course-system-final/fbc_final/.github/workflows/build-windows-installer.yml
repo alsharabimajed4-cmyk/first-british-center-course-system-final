@@ -1,0 +1,59 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      PHP_VERSION: '8.3.27'
+      MARIADB_VERSION: '11.4.8'
+      BUILD_SOURCE_ROOT: ${{ github.workspace }}\build
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Stage application and runtimes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = Join-Path $env:GITHUB_WORKSPACE 'first-british-center-course-system-final\fbc_final'
+          New-Item -ItemType Directory -Force -Path build\app, build\php, build\mariadb | Out-Null
+          Get-ChildItem $project -Force | Where-Object { $_.Name -notin @('.git', '.github', 'desktop') } | Copy-Item -Destination build\app -Recurse -Force
+          $phpZip = "php-$env:PHP_VERSION-nts-Win32-vs16-x64.zip"
+          Invoke-WebRequest "https://windows.php.net/downloads/releases/$phpZip" -OutFile $phpZip
+          Expand-Archive $phpZip -DestinationPath build\php -Force
+          Copy-Item build\php\php.ini-development build\php\php.ini
+          (Get-Content build\php\php.ini) -replace ';extension_dir = "ext"', 'extension_dir = "ext"' -replace ';extension=curl', 'extension=curl' -replace ';extension=mbstring', 'extension=mbstring' -replace ';extension=pdo_mysql', 'extension=pdo_mysql' | Set-Content build\php\php.ini
+          $mariaZip = "mariadb-$env:MARIADB_VERSION-winx64.zip"
+          Invoke-WebRequest "https://archive.mariadb.org/mariadb-$env:MARIADB_VERSION/winx64-packages/$mariaZip" -OutFile $mariaZip
+          Expand-Archive $mariaZip -DestinationPath build\mariadb-unpacked -Force
+          $mariaBin = Get-ChildItem build\mariadb-unpacked -Recurse -Filter mariadbd.exe | Select-Object -First 1
+          if (-not $mariaBin) { throw 'MariaDB server binary was not found.' }
+          $mariaHome = $mariaBin.Directory.Parent.FullName
+          Copy-Item "$mariaHome\*" build\mariadb -Recurse -Force
+          Copy-Item "$project\desktop\launch.ps1" build\launch.ps1 -Force
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path build\output | Out-Null
+          $project = Join-Path $env:GITHUB_WORKSPACE 'first-british-center-course-system-final\fbc_final'
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' "$project\desktop\FirstBritishCenter.iss"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: FirstBritishCenter-Setup
+          path: build/output/FirstBritishCenter-Setup.exe
+          if-no-files-found: error
