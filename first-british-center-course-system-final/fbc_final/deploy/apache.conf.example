@@ -1,0 +1,4 @@
+# Put this project outside public_html where possible and expose only public/.
+# If the hosting panel supports a DocumentRoot, set it to /path/to/project/public.
+# The included public/.htaccess handles SPA fallback and /api routing.
+# Deny direct access to private folders at the web-server level as an extra layer.

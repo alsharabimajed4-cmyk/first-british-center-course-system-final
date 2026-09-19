@@ -1,0 +1,26 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name courses.example.com;
+    root /var/www/first-british-course-system/public;
+    index index.html;
+
+    client_max_body_size 20M;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /api { rewrite ^ /api/index.php last; }
+    location = /api/ { rewrite ^ /api/index.php last; }
+    location ^~ /api/ { try_files $uri /api/index.php?$query_string; }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+    }
+
+    location ~* /(\.env|config|database|storage|install|deploy|docs)/ { deny all; }
+    location ~* \.(sql|log|bak|ini)$ { deny all; }
+}
