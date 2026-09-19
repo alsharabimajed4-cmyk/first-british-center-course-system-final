@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: windows-latest
     env:
-      PHP_VERSION: '8.3.27'
+      PHP_VERSION: '8.3.33'
       MARIADB_VERSION: '11.4.8'
       BUILD_SOURCE_ROOT: ${{ github.workspace }}\build
 
